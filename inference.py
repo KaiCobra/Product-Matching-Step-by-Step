@@ -32,6 +32,7 @@ def parse_args():
     parser.add_argument('--temerature', type=float, default=1e-5, help="Temperature for generation")
     parser.add_argument('--use_qwen_api', type=bool, default=False, help="Whether to use Qwen API for inference")
     parser.add_argument('-i', '--interactive', action='store_true', help="Run in interactive mode")
+    parser.add_argument('-m', '--match', action='store_true', help="Run in interactive match mode")
 
     return parser.parse_args()
 
@@ -186,6 +187,84 @@ def main():
             # save the desc with the p_name to prod_desc.parquet by pandas
             prod_desc.loc[prod_desc.shape[0]] = [p_name, messages[2]["content"]]
             prod_desc.to_parquet('prod_desc.parquet')
+
+    elif args.match:
+        while True:
+            p1_name = input("Enter product 1 name: ")
+            p2_name = input("Enter product 2 name: ")
+
+            # create or load prod_desc.parquet
+            if not os.path.exists('prod_desc.parquet'):
+                prod_desc = pd.DataFrame(columns=['p_name', 'desc'])
+            else:
+                prod_desc = pd.read_parquet('prod_desc.parquet')
+
+            if p1_name not in prod_desc['p_name'].values:
+                print(f"Description for product 1 does not exist! Creating description for product 1...")
+
+                corpus = '\n'.join(get_related_items(p1_name, items_dataset, top_k=args.top_k))
+                system_message = system_message_t.format(corpus=corpus)
+
+                prompts = [prompt.format(item=p1_name) for prompt in prompts_t]
+                messages = run_instructions(
+                    model, tokenizer, prompts, system_message, args.temerature,
+                    test_mode=False, use_qwen_api=args.use_qwen_api
+                )
+
+                # save the desc with the p_name to prod_desc.parquet by pandas
+                prod_desc.loc[prod_desc.shape[0]] = [p1_name, messages[2]["content"]]
+                prod_desc.to_parquet('prod_desc.parquet')
+
+            # create or load prod_desc.parquet
+            if not os.path.exists('prod_desc.parquet'):
+                prod_desc = pd.DataFrame(columns=['p_name', 'desc'])
+            else:
+                prod_desc = pd.read_parquet('prod_desc.parquet')
+
+            if p2_name not in prod_desc['p_name'].values:
+                print(f"Description for product 2 does not exist! Creating description for product 2...")
+
+                corpus = '\n'.join(get_related_items(p2_name, items_dataset, top_k=args.top_k))
+                system_message = system_message_t.format(corpus=corpus)
+
+                prompts = [prompt.format(item=p2_name) for prompt in prompts_t]
+                messages = run_instructions(
+                    model, tokenizer, prompts, system_message, args.temerature,
+                    test_mode=False, use_qwen_api=args.use_qwen_api
+                )
+
+                # save the desc with the p_name to prod_desc.parquet by pandas
+                prod_desc.loc[prod_desc.shape[0]] = [p2_name, messages[2]["content"]]
+                prod_desc.to_parquet('prod_desc.parquet')
+
+            print(f"Description for product 1:")
+            desc1 = prod_desc[prod_desc['p_name'] == p1_name]['desc'].values[0]
+            print(desc1)
+
+            print(f"Description for product 2:")
+            desc2 = prod_desc[prod_desc['p_name'] == p2_name]['desc'].values[0]
+            print(desc2)
+
+            match_prompts = [
+                f"""###Product1
+{p1_name}
+###Description1
+{desc1}
+###Product2
+{p2_name}
+###Description2
+{desc2}
+###Instruction
+1. 請根據上述描述，判斷 Product1 和 Product2 是否為一模一樣的商品、可進行進一步比價？任何顏色、規格上的差異都不被允許。
+2. 請直接回答「是」或「否」。不要回傳其他文字。""",
+            ]
+
+            messages = run_instructions(
+                model, tokenizer, match_prompts, None, args.temerature,
+                test_mode=False, use_qwen_api=args.use_qwen_api
+            )
+
+            print(f"Match result: {messages[2]['content']}")
 
     else:
         with tqdm(total=len(p_names)) as pbar:
