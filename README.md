@@ -1,10 +1,17 @@
 # Product Matching Step-by-Step
 
+## clone
+```bash
+git clone https://github.com/KaiCobra/Product-Matching-Step-by-Step.git
 ```
+
+
+
+```python
 python get_dataset.py
 ```
 
-```
+```python
 python inference.py --model_name "Qwen/Qwen2.5-7B-Instruct" --top_k 10 --inference_file ./data/test.pickle --dtype int4 --num_inference -1 -m
 ```
 
