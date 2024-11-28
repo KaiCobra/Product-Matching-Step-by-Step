@@ -1,5 +1,13 @@
 # Product Matching Step-by-Step
 
+```
+python get_dataset.py
+```
+
+```
+python inference.py --model_name "Qwen/Qwen2.5-7B-Instruct" --top_k 10 --inference_file ./data/test.pickle --dtype int4 --num_inference -1 -m
+```
+
 1. 取得兩份 csv 或 parquet 反正就是兩列商品，來自兩個不同平台 (或賣場)。
 2. 用 semantic 先做第一階段匹配，設定閥值、取出第一階段潛在相同的商品。完成後得到一個三欄的 dataframe，分別是商品名稱、商品名稱、相似度。其中相似度低於閥值的商品將被排除。
 3. 使用 Product Matching Step-by-Step 做第二階段分類匹配。具體流程大致如下：
