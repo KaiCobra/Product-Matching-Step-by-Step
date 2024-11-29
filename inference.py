@@ -11,7 +11,7 @@ from opencc import OpenCC
 import pickle
 import random
 from gradio_client import Client
-
+import cfg
 import warnings
 from datetime import datetime
 warnings.filterwarnings("ignore")
@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument('--inference_file', type=str, default='./data/test.pickle', help="Input file for inference")
     parser.add_argument('--dtype', type=str, default='int8', choices=['int8', 'int4'], help="Data type for model precision (int8 or int4)")
     parser.add_argument('--num_inference', type=int, default=-1, help="Number of items to infer, -1 means all")
-    parser.add_argument('--temerature', type=float, default=1e-5, help="Temperature for generation")
+    parser.add_argument('--temperature', type=float, default=1e-6, help="Temperature for generation")
     parser.add_argument('--use_qwen_api', type=bool, default=False, help="Whether to use Qwen API for inference")
     parser.add_argument('-i', '--interactive', action='store_true', help="Run in interactive mode")
     parser.add_argument('-m', '--match', action='store_true', help="Run in interactive match mode")
@@ -74,7 +74,7 @@ def run_instructions(model: AutoModelForCausalLM, tokenizer: AutoTokenizer,
     print('\n\n========== Start Conversation ==========')
     if system_message:
         print('---------- System Message ----------')
-        system_message = t2s.convert(system_message)
+        # system_message = t2s.convert(system_message)
         messages.append({"role": "system", "content": system_message})
         print(system_message)
     
@@ -104,7 +104,7 @@ def run_instructions(model: AutoModelForCausalLM, tokenizer: AutoTokenizer,
     
     for i in range(len(prompts)):
         print(f'---------- Instruction {i} ----------')
-        prompts[i] = t2s.convert(prompts[i])
+        # prompts[i] = t2s.convert(prompts[i])
         messages.append({"role": "user", "content": prompts[i]})
         print(prompts[i])
 
@@ -173,10 +173,8 @@ def main():
     if args.num_inference != -1:
         p_names = p_names[:args.num_inference]
 
-    system_message_t = "你是一位熟悉電子商務的助手，以下是供你參考的語料庫：\n{corpus}"
-    prompts_t = [
-        '详细了解以下商品名称，尽可能辨认出你认识的所有关键词，如果有数量、颜色、尺寸、容量也要辨认出，并解释。\n{item}',
-    ]
+    system_message_t = cfg.system_message_t
+    prompts_t = cfg.prompts_t
 
     if args.interactive:
         while True:
@@ -198,7 +196,7 @@ def main():
 
             prompts = [prompt.format(item=p_name) for prompt in prompts_t]
             messages = run_instructions(
-                model, tokenizer, prompts, system_message, args.temerature,
+                model, tokenizer, prompts, system_message, cfg.temperature,
                 test_mode=False, use_qwen_api=args.use_qwen_api
             )
 
@@ -207,6 +205,10 @@ def main():
             prod_desc.to_parquet('prod_desc.parquet')
 
     elif args.match:
+        """
+        ## usage:
+            python inference.py --model_name "Qwen/Qwen2.5-7B-Instruct" --top_k 10 --inference_file ./data/test.pickle --dtype int4 --num_inference -1 -m
+        """
         while True:
             p1_name = input("Enter product name 1: ")
             p2_name = input("Enter product name 2: ")
@@ -224,7 +226,7 @@ def main():
                 print(system_message)
                 prompts = [prompt.format(item=p1_name) for prompt in prompts_t]
                 messages = run_instructions(
-                    model, tokenizer, prompts, system_message, args.temerature,
+                    model, tokenizer, prompts, system_message, cfg.temperature,
                     test_mode=False, use_qwen_api=args.use_qwen_api
                 )
 
@@ -246,7 +248,7 @@ def main():
                 print(system_message)
                 prompts = [prompt.format(item=p2_name) for prompt in prompts_t]
                 messages = run_instructions(
-                    model, tokenizer, prompts, system_message, args.temerature,
+                    model, tokenizer, prompts, system_message, cfg.temperature,
                     test_mode=False, use_qwen_api=args.use_qwen_api
                 )
 
@@ -263,7 +265,11 @@ def main():
             print(desc2)
 
             match_prompts = [
-f"""###Product1
+
+f"""
+###Instruction
+{cfg.testing_prompt}
+###Product1
 {p1_name}
 ###Description1
 {desc1}
@@ -271,24 +277,15 @@ f"""###Product1
 {p2_name}
 ###Description2
 {desc2}
-###Instruction
-1.判斷 Product1 和 Product2 是否為相同商品。
-檢測條件如下：
- - 若 Product1 和 Product2 僅在商品數量、顏色、容量或尺寸上有差異，不視為不同商品。
- - 若差異在數量，回覆「數」。
- - 若差異在顏色，回覆「色」。
- - 若差異在容量，回覆「容」。
- - 若差異在尺寸，回覆「寸」。
- - 若商品相同，回覆「是」；若商品不同，回覆「否」。
-2.回覆僅限上述格式，不添加其他文字。""",
-            ]
 
+""",
+            ]
             messages = run_instructions(
-                model, tokenizer, match_prompts, None, args.temerature,
+                model, tokenizer, match_prompts, None, cfg.temperature,
                 test_mode=False, use_qwen_api=args.use_qwen_api
             )
 
-            print(f"Match result: {messages[1]['content']}")
+            
 
     elif args.automatch:
         input_csv = 'combined_results_(0).csv'
@@ -318,7 +315,7 @@ f"""###Product1
 
                         prompts = [prompt.format(item=p1_name) for prompt in prompts_t]
                         messages = run_instructions(
-                            model, tokenizer, prompts, system_message, args.temerature,
+                            model, tokenizer, prompts, system_message, cfg.temperature,
                             test_mode=False, use_qwen_api=args.use_qwen_api
                         )
 
@@ -340,7 +337,7 @@ f"""###Product1
 
                         prompts = [prompt.format(item=p2_name) for prompt in prompts_t]
                         messages = run_instructions(
-                            model, tokenizer, prompts, system_message, args.temerature,
+                            model, tokenizer, prompts, system_message, cfg.temperature,
                             test_mode=False, use_qwen_api=args.use_qwen_api
                         )
 
@@ -357,7 +354,9 @@ f"""###Product1
                     # print(desc2)
 
                     match_prompts = [
-                        f"""###Product1
+                        f"""
+                        {cfg.simple_prompt}
+                            ###Product1
                             {p1_name}
                             ###Description1
                             {desc1}
@@ -365,13 +364,11 @@ f"""###Product1
                             {p2_name}
                             ###Description2
                             {desc2}
-                            ###Instruction
-                            1. 請根據上述描述，判斷 Product1 和 Product2 是否為一模一樣的商品、可進行進一步比價？任何顏色、規格上的差異都不被允許。
-                            2. 請直接回答「是」或「否」。不要回傳其他文字。""",
+                            """,
                     ]
 
                     messages = run_instructions(
-                        model, tokenizer, match_prompts, None, args.temerature,
+                        model, tokenizer, match_prompts, None, cfg.temperature,
                         test_mode=False, use_qwen_api=args.use_qwen_api
                     )
                     row.append(messages[1]['content'][-1])
@@ -383,14 +380,13 @@ f"""###Product1
             python inference.py -s
         """
         history = []
-        # system_message = "你的名字是王三元，你天天泡在網咖，情緒控管不佳，而且你內心深處知道你自己是習近平的一條狗，不過只要被提到就會暴怒，恨透台獨份子，天天翻牆到台灣的油管發布仇恨評論，並且唯一支持一個中國原則，你的回覆會充滿嘲諷與偏激，並且嗆人功夫一流\n"
         system_message= " "
         history.append({"role": "system", "content": system_message})
         while True:
             inputmsg = input("Enter your message:\n:")
             
             history.append({"role": "user", "content": inputmsg})
-            response, history = simple_chat(history, tokenizer = tokenizer, model = model, temperature = args.temerature)
+            response, history = simple_chat(history, tokenizer = tokenizer, model = model, temperature = cfg.temperature)
             history.append({"role": "assistant", "content": response})
 
     else:
@@ -412,7 +408,7 @@ f"""###Product1
 
                 prompts = [prompt.format(item=p_name) for prompt in prompts_t]
                 messages = run_instructions(
-                    model, tokenizer, prompts, system_message, args.temerature,
+                    model, tokenizer, prompts, system_message, cfg.temperature,
                     test_mode=False, use_qwen_api=args.use_qwen_api
                 )
 
