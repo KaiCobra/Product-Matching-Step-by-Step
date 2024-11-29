@@ -132,7 +132,8 @@ def main():
 
             # 添加新的列用于存储结果
             df['LLM result'] = ""
-
+            df['Description_A'] = ""
+            df['Description_B'] = ""
             # 创建或加载产品描述 DataFrame
             if not os.path.exists('prod_desc.parquet'):
                 prod_desc = pd.DataFrame(columns=['p_name', 'desc'])
@@ -157,7 +158,7 @@ def main():
                         temperature=args.temperature,
                         test_mode=False
                     )
-
+                    # print("Prod Desc. A: ", messages[2]["content"])
                     # 保存新的描述到 DataFrame
                     prod_desc = pd.concat([prod_desc, pd.DataFrame({'p_name': [p1_name], 'desc': [messages[2]["content"]]})], ignore_index=True)
                     prod_desc.to_parquet('prod_desc.parquet')
@@ -175,7 +176,7 @@ def main():
                         temperature=args.temperature,
                         test_mode=False
                     )
-
+                    # print("Prod Desc. B: ", messages[2]["content"])
                     prod_desc = pd.concat([prod_desc, pd.DataFrame({'p_name': [p2_name], 'desc': [messages[2]["content"]]})], ignore_index=True)
                     prod_desc.to_parquet('prod_desc.parquet')
 
@@ -211,7 +212,8 @@ def main():
 
                 # 保存 LLM 结果
                 df.at[index, 'LLM result'] = messages[1]['content'][-1]
-
+                df.at[index, 'Description_A'] = desc1
+                df.at[index, 'Description_B'] = desc2
                 # 如果想要限制行数（测试用途）
                 # if index == 1:
                 #     break

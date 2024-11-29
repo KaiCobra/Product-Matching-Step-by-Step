@@ -138,6 +138,9 @@ f"""###Product1
         )
 
         df.at[index, 'LLM result'] = messages[1]['content'][-1]
+        df.at[index, 'Desc A'] = desc1
+        df.at[index, 'Desc B'] = desc2
+        df.at[index, 'decide'] = messages[1]['content'][-1]
 
     except Exception as e:
         print(f"Error processing row {index}: {e}")
@@ -146,6 +149,11 @@ f"""###Product1
 
 # 主程式
 def main():
+    """""
+        usage: GPT_thread.py 
+        rememeber to change the input_csv_dirs and output_csv_dirs to your own path
+    """
+
     max_threads = os.cpu_count() * 2
     args = parse_args()
     system_message_t = "你是一位熟悉電子商務的助手，以下是供你參考的語料庫：\n{corpus}"
@@ -155,10 +163,11 @@ def main():
     
     items_dataset = load_items('random_samples_1M')
     input_csv_dirs = './M11307002/b2c_output_kai'
-    output_csv_dirs = './M11307002/b2c_labelled_kai'
+    output_csv_dirs = './M11307002/b2c_desc_kai'
 
     for input_csv in os.listdir(input_csv_dirs):
         input_csv_path = os.path.join(input_csv_dirs, input_csv)
+        print(f"Processing file {input_csv}")
         if os.path.exists(os.path.join(output_csv_dirs, input_csv.replace('.csv', '_with_results.csv'))):
             print(f"File {input_csv} already processed. Skipping.")
             continue
@@ -168,6 +177,15 @@ def main():
 
         if 'LLM result' not in df.columns:
             df['LLM result'] = ""
+
+        if 'Desc.A' not in df.columns:
+            df['Desc A'] = ""
+
+        if 'Desc.B' not in df.columns:
+            df['Desc B'] = ""
+
+        if 'decide' not in df.columns:
+            df['decide'] = ""
 
         if not os.path.exists('prod_desc.parquet'):
             prod_desc = pd.DataFrame(columns=['p_name', 'desc'])
