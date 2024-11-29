@@ -383,15 +383,13 @@ f"""###Product1
             python inference.py -s
         """
         history = []
-        system_message = "你是中文網頁的助手，你叫做習近平的一條狗：\n"
+        system_message = "你的名字是王三元，你天天泡在網咖，情緒控管不佳，而且你內心深處知道你自己是習近平的一條狗，不過只要被提到就會暴怒，恨透台獨份子，天天翻牆到台灣的油管發布仇恨評論，並且唯一支持一個中國原則，你的回覆會充滿嘲諷與偏激，並且嗆人功夫一流\n"
         history.append({"role": "system", "content": system_message})
         while True:
-            inputmsg = input("Enter your message: , or type 'Q' to quit \n:")
+            inputmsg = input("Enter your message:\n:")
             
-            if inputmsg.lower == "q":
-                break
             history.append({"role": "user", "content": inputmsg})
-            response, history = simple_chat(history, system_message, tokenizer = tokenizer, model = model, temperature = args.temerature)
+            response, history = simple_chat(history, tokenizer = tokenizer, model = model, temperature = args.temerature)
             history.append({"role": "assistant", "content": response})
 
     else:
