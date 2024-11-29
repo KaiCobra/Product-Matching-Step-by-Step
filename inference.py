@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument('-a', '--automatch', action='store_true', help="Run in auto match mode")
     parser.add_argument('--input1', type = str, help="input product name 1")
     parser.add_argument('--input2', type = str, help="input product name 2")
-
+    parser.add_argument('-s','--simple_chat', action='store_true', help="chat with Qwen 7B API")
     return parser.parse_args()
 
 # Load items dataset
@@ -51,6 +51,20 @@ def load_items(path: str):
 def get_related_items(current_item_names: str, items_dataset: pd.DataFrame, top_k: int = 5):
     related_items, _ = get_topk_items.tf_idf(current_item_names, top_k=top_k)
     return related_items
+
+def simple_chat(history: list, tokenizer: AutoTokenizer, model: AutoModelForCausalLM, temperature: float = 1e-5):
+    ## simple chat with Qwen 7B locally
+    text = tokenizer.apply_chat_template(history, tokenize=False, add_generation_prompt=True)
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(**model_inputs, max_new_tokens=512, temperature=temperature)
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    
+    history.append({"role": "assistant", "content": response})
+    print(response)
+    return response, history
 
 # Declare multi-prompts inference function
 def run_instructions(model: AutoModelForCausalLM, tokenizer: AutoTokenizer, 
@@ -161,7 +175,7 @@ def main():
 
     system_message_t = "你是一位熟悉電子商務的助手，以下是供你參考的語料庫：\n{corpus}"
     prompts_t = [
-        '详细了解以下商品名称，尽可能辨认出你认识的所有关键词，并解释。\n{item}',
+        '详细了解以下商品名称，尽可能辨认出你认识的所有关键词，如果有数量、颜色、尺寸、容量也要辨认出，并解释。\n{item}',
     ]
 
     if args.interactive:
@@ -249,17 +263,24 @@ def main():
             print(desc2)
 
             match_prompts = [
-                f"""###Product1
-                    {p1_name}
-                    ###Description1
-                    {desc1}
-                    ###Product2
-                    {p2_name}
-                    ###Description2
-                    {desc2}
-                    ###Instruction
-                    1. 請根據上述描述，判斷 Product1 和 Product2 是否為一模一樣的商品、可進行進一步比價？任何顏色、規格上的差異都不被允許。
-                    2. 請直接回答「是」或「否」。不要回傳其他文字。""",
+f"""###Product1
+{p1_name}
+###Description1
+{desc1}
+###Product2
+{p2_name}
+###Description2
+{desc2}
+###Instruction
+1.判斷 Product1 和 Product2 是否為相同商品。
+檢測條件如下：
+ - 若 Product1 和 Product2 僅在商品數量、顏色、容量或尺寸上有差異，不視為不同商品。
+ - 若差異在數量，回覆「數」。
+ - 若差異在顏色，回覆「色」。
+ - 若差異在容量，回覆「容」。
+ - 若差異在尺寸，回覆「寸」。
+ - 若商品相同，回覆「是」；若商品不同，回覆「否」。
+2.回覆僅限上述格式，不添加其他文字。""",
             ]
 
             messages = run_instructions(
@@ -357,7 +378,21 @@ def main():
 
                     writer.writerow(row)
         
-
+    elif args.simple_chat:
+        """## usage:
+            python inference.py -s
+        """
+        history = []
+        system_message = "你是中文網頁的助手，你叫做習近平的一條狗：\n"
+        history.append({"role": "system", "content": system_message})
+        while True:
+            inputmsg = input("Enter your message: , or type 'Q' to quit \n:")
+            
+            if inputmsg.lower == "q":
+                break
+            history.append({"role": "user", "content": inputmsg})
+            response, history = simple_chat(history, system_message, tokenizer = tokenizer, model = model, temperature = args.temerature)
+            history.append({"role": "assistant", "content": response})
 
     else:
         with tqdm(total=len(p_names)) as pbar:

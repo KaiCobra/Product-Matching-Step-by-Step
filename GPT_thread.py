@@ -110,16 +110,24 @@ def process_row(index, row, prod_desc, items_dataset, args, system_message_t, pr
         desc2 = prod_desc.loc[prod_desc['p_name'] == p2_name, 'desc'].values[0]
 
         match_prompts = [
-            f"""###Product1
-            {p1_name}
-            ###Description1
-            {desc1}
-            ###Product2
-            {p2_name}
-            ###Description2
-            {desc2}
-            ###Instruction
-            1. 請判斷這兩個商品是否相同，回傳「是」或「否」。"""
+f"""###Product1
+{p1_name}
+###Description1
+{desc1}
+###Product2
+{p2_name}
+###Description2
+{desc2}
+###Instruction
+1.判斷 Product1 和 Product2 是否為相同商品。
+檢測條件如下：
+ - 若 Product1 和 Product2 僅在商品數量、顏色、容量或尺寸上有差異，不視為不同商品。
+ - 若差異在數量，回覆「數」。
+ - 若差異在顏色，回覆「色」。
+ - 若差異在容量，回覆「容」。
+ - 若差異在尺寸，回覆「寸」。
+ - 若商品相同，回覆「是」；若商品不同，回覆「否」。
+2.回覆僅限上述格式，不添加其他文字。"""
         ]
 
         messages = run_instructions(
@@ -142,12 +150,12 @@ def main():
     args = parse_args()
     system_message_t = "你是一位熟悉電子商務的助手，以下是供你參考的語料庫：\n{corpus}"
     prompts_t = [
-        '详细了解以下商品名称，尽可能辨认出你认识的所有关键词，并解释。\n{item}',
+        '详细了解以下商品名称，尽可能辨认出你认识的所有关键词，并解释。如果有数量、颜色、尺寸、容量也要辨认出\n{item}',
     ]
     
     items_dataset = load_items('random_samples_1M')
-    input_csv_dirs = './b2c'
-    output_csv_dirs = './B2C_all_labelled_thread'
+    input_csv_dirs = './M11307002/b2c_output_kai'
+    output_csv_dirs = './M11307002/b2c_labelled_kai'
 
     for input_csv in os.listdir(input_csv_dirs):
         input_csv_path = os.path.join(input_csv_dirs, input_csv)
