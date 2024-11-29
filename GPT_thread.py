@@ -69,12 +69,16 @@ def run_instructions(model: str, prompts: list[str], system_message: str = None,
 
     return messages
 
+# 定義鎖
+
+
 # 定義每行處理的函式
 def process_row(index, row, prod_desc, items_dataset, args, system_message_t, prompts_t, df, pbar):
     try:
         p1_name = row['商品名稱A']
         p2_name = row['商品名稱B']
-
+        
+    
         if p1_name not in prod_desc['p_name'].values:
             corpus = '\n'.join(get_related_items(p1_name, items_dataset, top_k=args.top_k))
             system_message = system_message_t.format(corpus=corpus)
@@ -111,15 +115,22 @@ def process_row(index, row, prod_desc, items_dataset, args, system_message_t, pr
         desc2 = prod_desc.loc[prod_desc['p_name'] == p2_name, 'desc'].values[0]
 
         match_prompts = [
-f"""###Product1
+f"""
+### Instruction
+{cfg.testing_prompt}
+###Product1
 {p1_name}
-###Description1
+
+###Product1 Description
 {desc1}
+
 ###Product2
 {p2_name}
-###Description2
+
+###Product2 Description
 {desc2}
-{cfg.testing_prompt}"""
+
+"""
         ]
 
         messages = run_instructions(
@@ -129,10 +140,10 @@ f"""###Product1
             test_mode=False
         )
 
-        df.at[index, 'LLM result'] = messages[1]['content'][-1]
+        df.at[index, 'LLM result'] = messages[1]['content'][:-5]
         df.at[index, 'Desc A'] = desc1
         df.at[index, 'Desc B'] = desc2
-        df.at[index, 'decide'] = messages[1]['content'][-1]
+        df.at[index, 'decide'] = messages[1]['content']
 
     except Exception as e:
         print(f"Error processing row {index}: {e}")
@@ -148,14 +159,12 @@ def main():
 
     max_threads = os.cpu_count() * 2
     args = parse_args()
-    system_message_t = "你是一位熟悉電子商務的助手，以下是供你參考的語料庫：\n{corpus}"
-    prompts_t = [
-        '详细了解以下商品名称，尽可能辨认出你认识的所有关键词，并解释。如果有数量、颜色、尺寸、容量也要辨认出。\n{item}',
-    ]
+    system_message_t = cfg.system_message_t
+    prompts_t = cfg.prompts_t
     
     items_dataset = load_items('random_samples_1M')
     input_csv_dirs = './M11307002/b2c_output_kai'
-    output_csv_dirs = './M11307002/b2c_desc_with_rag_kai'
+    output_csv_dirs = './M11307002/b2c_desc_with_rag_kai_2'
 
     for input_csv in os.listdir(input_csv_dirs):
         input_csv_path = os.path.join(input_csv_dirs, input_csv)
@@ -183,7 +192,7 @@ def main():
             prod_desc = pd.DataFrame(columns=['p_name', 'desc'])
         else:
             prod_desc = pd.read_parquet('prod_desc.parquet')
-
+        
         threads = []
         with tqdm(total=len(df), desc="Processing Rows") as pbar:
             for index, row in df.iterrows():
