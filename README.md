@@ -2,7 +2,7 @@
 
 ## clone
 ```bash
-git clone -b Kai https://github.com/KaiCobra/Product-Matching-Step-by-Step.git
+git clone -b Kai3 https://github.com/KaiCobra/Product-Matching-Step-by-Step.git
 ```
 
 
