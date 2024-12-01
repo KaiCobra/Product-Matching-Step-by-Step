@@ -13,7 +13,10 @@ import random
 from gradio_client import Client
 from openai import OpenAI
 import threading
-
+from datasets import load_dataset
+import requests
+from batch_api.write2jsonl import step1
+import cfg
 import warnings
 from datetime import datetime
 warnings.filterwarnings("ignore")
@@ -35,7 +38,7 @@ def parse_args():
     parser.add_argument('--temperature', type=float, default=5e-6, help="Temperature for generation")
     # parser.add_argument('--use_qwen_api', type=bool, default=False, help="Whether to use Qwen API for inference")
     parser.add_argument('-hw', '--hw_matching', action='store_true', help="Run in HW mode")
-    # parser.add_argument('-m', '--match', action='store_true', help="Run in interactive match mode")
+    parser.add_argument('-b', '--batch_api', action='store_true', help="Run in Chat GPT batch api mode")
     # parser.add_argument('-a', '--automatch', action='store_true', help="Run in auto match mode")
     # parser.add_argument('--input1', type = str, help="input product name 1")
     # parser.add_argument('--input2', type = str, help="input product name 2")
@@ -53,6 +56,25 @@ def load_items(path: str):
 def get_related_items(current_item_names: str, items_dataset: pd.DataFrame, top_k: int = 5):
     related_items, _ = get_topk_items.tf_idf(current_item_names, top_k=top_k)
     return related_items
+
+def load_final_dataset():
+
+    if not os.path.exists('./GT'):
+        os.mkdir('./GT')
+    for i in range(1, 70):
+        if os.path.exists(f'./GT/B2C_part_{i}.csv'):
+            return None
+    base_name_path = "./GT/B2C_part_{index}.csv"
+        # 文件名列表（假設它們在同一個目錄中）
+    base_url = "https://huggingface.co/datasets/stanley-Lee/b2c_NTUST_EE5327701/resolve/main/B2C_part_{index}.csv"
+
+    for file_index in range(1,70):
+        url = base_url.format(index = file_index)
+        response = requests.get(url)
+        save_path = base_name_path.format(index = file_index)
+        with open(save_path, "wb") as f:
+            f.write(response.content)
+    print('dataset loaded')
 
 # Declare multi-prompts inference function
 def run_instructions(model: str, 
@@ -90,8 +112,6 @@ def run_instructions(model: str,
     print('========== End Conversation ==========')
     return messages
 
-
-
 def main():
     args = parse_args()
     print(args)
@@ -110,12 +130,45 @@ def main():
     if args.num_inference != -1:
         p_names = p_names[:args.num_inference]
 
-    system_message_t = "你是一位熟悉電子商務的助手，以下是供你參考的語料庫：\n{corpus}"
-    prompts_t = [
-        '详细了解以下商品名称，尽可能辨认出你认识的所有关键词，并解释。\n{item}',
-    ]
+    system_message_t = cfg.system_message_t
+    prompts_t = cfg.prompts_t
 
-    if args.hw_matching:
+    if args.batch_api:
+        # Load the dataset into ./GT directory
+        load_final_dataset()
+        # Load the dataset
+        if not os.path.exists('prod_desc.parquet'):
+            prod_desc = pd.DataFrame(columns=['p_name', 'desc'])
+        else:
+            prod_desc = pd.read_parquet('prod_desc.parquet')
+
+        ds_list = os.listdir('./GT')
+        for ds in ds_list[:]:
+            if os.path.exists(f"./GT_jsonl/{ds.replace('.csv', '.jsonl')}"):
+                print(f"File {ds} already processed. Skip.")
+                continue
+            # Load the dataset
+            df = pd.read_csv(f'./GT/{ds}')
+            # Get the product names
+            p_names_A = df['商品名稱A'].to_list()
+            p_names_A = pd.Series(p_names_A).unique()
+            # Create the JSONL file
+            for i, p_name in enumerate(p_names_A):
+                corpus = '\n'.join(get_related_items(p_name, items_dataset, top_k=args.top_k))
+                system_message = system_message_t.format(corpus=corpus)
+                user_prompt: str = prompts_t[0].format(item=p_name)
+                output_file :str = ds.replace('.csv', '.jsonl')
+                if not os.path.exists(f"./GT_jsonl"):
+                    os.mkdir(f"./GT_jsonl")
+                step1(system_prompt = system_message, user_prompt = user_prompt, index = i, output_file=f"./GT_jsonl/{output_file}")
+
+            print(f"輸出完成，結果已寫入 {output_file}")
+        
+
+
+
+
+    elif args.hw_matching:
         input_csv_dirs = './C2C_all'
         output_csv_dirs = './C2C_all_labelled'
         for input_csv in os.listdir(input_csv_dirs):

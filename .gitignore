@@ -4,6 +4,7 @@ results/
 GT/
 *.csv
 *jsonl
+GT_jsonl/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
