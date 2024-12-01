@@ -1,6 +1,9 @@
 random_samples_1M
 *.pkl
 results/
+GT/
+*.csv
+*jsonl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
